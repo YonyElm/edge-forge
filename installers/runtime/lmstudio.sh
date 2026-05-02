@@ -1,5 +1,11 @@
 source "$ROOT_DIR/lib/core.sh"
-source "$ROOT_DIR/lib/system.sh"
+
+check_os() {
+  case "$OSTYPE" in
+    linux-gnu*|darwin*) ;;
+    *) die "Unsupported OS: $OSTYPE" ;;
+  esac
+}
 
 run() {
   log "== LM Studio Runtime =="

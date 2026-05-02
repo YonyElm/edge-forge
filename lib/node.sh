@@ -1,10 +1,6 @@
+# Requires: core.sh (provides command_exists, log, die)
+
 ensure_node() {
-  command_exists() { command -v "$1" >/dev/null 2>&1; }
-
-  log() { echo "[node] $1"; }
-  die() { echo "[node] ERROR: $1" >&2; exit 1; }
-
-  # --- Detect working Node ---
   if command_exists node && command_exists npm; then
     if node -e "console.log('ok')" >/dev/null 2>&1; then
       NODE_MAJOR=$(node -v | sed 's/v//' | cut -d. -f1)
@@ -36,7 +32,6 @@ ensure_node() {
     sudo apt-get update
     sudo apt-get install -y curl ca-certificates
 
-    # Try NodeSource ONLY if system supports it
     if curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -; then
       if sudo apt-get install -y nodejs; then
         if node -e "console.log('ok')" >/dev/null 2>&1; then
@@ -48,12 +43,10 @@ ensure_node() {
 
     log "NodeSource failed or incompatible. Switching to nvm..."
 
-    # --- Install nvm ---
     if ! command_exists nvm; then
       curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash
     fi
 
-    # --- Load nvm (both possible paths) ---
     export NVM_DIR="$HOME/.nvm"
     [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
 
@@ -70,10 +63,8 @@ ensure_node() {
     nvm use 18
     nvm alias default 18
 
-    # --- Force PATH fix ---
     export PATH="$HOME/.nvm/versions/node/$(nvm current)/bin:$PATH"
 
-    # --- Final verification ---
     node -e "console.log('Node working:', process.version)" || die "Node failed runtime check"
     npm -v >/dev/null 2>&1 || die "npm missing after install"
 

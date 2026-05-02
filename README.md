@@ -18,18 +18,17 @@ The goal is to provide a **reproducible, scriptable, and composable setup** for 
 
 # ⚙️ Architecture Overview
 
-The system is organized into three layers:
+The system is organized into four layers:
 
-### 1. Entry Point
+### 1. Entry Points
 
-* `bin/install.sh`
-  Central CLI dispatcher for all install operations
+* `bin/install.sh` — Central CLI dispatcher for all install operations
+* `bin/activate.sh` — Dispatcher for environment activation
 
 ### 2. Shared Libraries (`lib/`)
 
 Reusable primitives:
 
-* system detection (OS, GPU)
 * dependency checks (Node, CLI tools)
 * runtime helpers (Ollama lifecycle)
 
@@ -39,6 +38,13 @@ Discrete, composable modules:
 
 * **runtime/** → installs model backends
 * **coding-agents/** → installs agent/dev tools
+
+### 4. Activators (`activators/`)
+
+Interactive launchers:
+
+* **docker.sh** → standalone Docker container
+* **ollama.sh** → interactive model management + agent selection
 
 This separation allows:
 
@@ -96,7 +102,7 @@ The system is safe to re-run:
 
 # 🧪 Usage
 
-### Individual components
+### Install components
 
 ```bash
 ./bin/install.sh runtime ollama
@@ -107,47 +113,63 @@ The system is safe to re-run:
 ./bin/install.sh coding-agent claude
 ```
 
-# 🧠 Runtime Model Considerations
+### Activate environments
 
-## Model Isolation
+```bash
+./bin/activate.sh docker           # Launch Docker container
+./bin/activate.sh ollama           # Interactive: list models, build from config, pick agent
+```
 
-Each runtime uses a different format:
+#### Interactive Ollama Activator
 
-* Ollama → bundled model + runtime config
-* LM Studio → raw GGUF weights
+`./bin/activate.sh ollama` provides an interactive workflow:
 
-Even identical models:
+1. **Lists existing models** currently installed
+2. **Detects unbuilt Modelfiles** in `config/ollama-models/` and offers to build them
+3. **Model selection** — choose from installed models
+4. **Agent selection** — pick `aider`, `opencode`, or `claude`
+5. **Launches the agent** with the selected model (installs it if missing)
 
-* are stored separately
-* are not interchangeable
+---
 
-# Repository Stracture
+# Repository Structure
 
+```
 repo/
 ├── bin/
-│   └── install              # main entrypoint
+│   ├── install.sh           # main entrypoint (installs runtimes & agents)
+│   └── activate.sh          # activator dispatcher (launches environments)
+│
+├── activators/              # environment launchers (interactive)
+│   ├── docker.sh            # Docker container launcher
+│   └── ollama.sh            # Interactive: list models, build from config, pick agent
 │
 ├── lib/
 │   ├── core.sh              # shared utils (logging, checks)
-│   ├── system.sh            # OS/GPU detection
-│   ├── node.sh              # node/npm install logic
-│   └── ollama.sh            # ollama helpers
+│   ├── node.sh              # node/npm install logic (requires core.sh)
+│   └── ollama.sh            # ollama helpers (requires core.sh)
 │
 ├── installers/
 │   ├── runtime/
-│   │   ├── ollama.sh
-│   │   └── lmstudio.sh
+│   │   ├── ollama.sh        # idempotent: install ollama + pull model
+│   │   └── lmstudio.sh      # idempotent: check LM Studio + model
 │   │
-│   └── cli/
+│   └── coding-agents/
 │       ├── claude.sh
 │       ├── opencode.sh
 │       └── aider.sh
 │
 ├── config/
+│   ├── config.env           # environment variables
+│   ├── models.local.env     # per-machine override (gitignored)
 │   ├── opencode-lmstudio.json.tpl
-│   └── config.env
+│   └── ollama-models/       # Modelfiles for custom model configs
+│       └── gemma3-4b-16k
 │
 └── README.md
+```
+
+---
 
 # Notes & Design Decisions
 
@@ -156,113 +178,11 @@ repo/
 
   * Ollama: `ollama list | grep`
   * LM Studio: filesystem heuristic (no official CLI)
-* **GPU detection** is advisory only (doesn’t block install).
 * Script is **safe to re-run** (no duplicate installs or downloads).
-
-## Models are not shared between `ollama` and `LM Studio`
-
-Models are not shared between Ollama and LM Studio because they use different model packaging and runtimes. Ollama stores models in a bundled format that includes metadata, templates, and runtime configuration, while LM Studio loads raw GGUF files directly. They also keep models in separate directories and do not index or detect each other’s storage locations. As a result, even if the underlying weights are identical, each tool treats them as independent and incompatible installations.
-
-If using the same model in both tools expect 2X disk space requirement
+* **Installers** are idempotent setup routines. **Activators** are interactive launchers.
 
 ---
 
-## Practical recommendation
+## Model Knowledge Guide
 
-Pick **one primary runtime**:
-
-### Use Ollama if you:
-
-* Want automation / scripting / APIs
-* Are building pipelines or services
-* Need reproducible installs (like your script)
-* Understand its configuration to yield the most out of the tool
-
-### Use LM Studio if you:
-
-* Want GUI-based experimentation
-* Compare models interactively
-* Tweak parameters visually
-* Faster out of the box setup and interaction with the model
-
----
-
-## LM Studio vs Ollama performance reality
-
-* LM Studio often feels **faster or more responsive**
-* Ollama sometimes feels slower for the same model
-
-### Why this happens:
-
-Ollama:
-
-* Optimized for **general server runtime + flexibility**
-* May use more conservative defaults (context, scheduling, KV cache)
-* Can incur overhead from model loading / serving pipeline
-
-LM Studio:
-
-* Optimized for **interactive inference (desktop UX)**
-* Aggressive GPU/Metal optimizations (especially on Apple Silicon)
-* Often better tuned kernels for supported models
-
----
-
-## Context size = major speed factor (very important)
-
-> **Larger context = slower responses**
-
-Because transformer cost grows with:
-
-* Attention over all previous tokens
-* KV-cache memory usage
-* Bandwidth pressure on GPU/CPU
-
-### Practical behavior:
-
-| Context size | Performance              |
-| ------------ | ------------------------ |
-| 4K           | fast                     |
-| 8K           | normal                   |
-| 16K          | noticeably slower        |
-| 32K          | slow                     |
-| 64K+         | very slow / memory heavy |
-
-
-Even small models slow down significantly when context increases.
-
-## “Minimum tokens” for agentic workflows
-
-> agents need ~16K context or more to boot and operate normally
-
-Agent loops require:
-
-* system prompt (instructions)
-* tool definitions
-* conversation history
-* code context
-* intermediate reasoning traces
-
-So even small tasks accumulate tokens fast.
-
-### Typical breakdown:
-
-* system prompt: ~1–2K
-* tools schema: ~1–3K
-* code context: ~2–8K
-* conversation history: grows continuously
-
------
-
-#### Ollama Commands
-
-* `ollama run <model>`
-* `ollama stop <model>`
-* `ollama rm <model>`
-* `ollama ls`
-* `ollama ps`
-* `OLLAMA_NUM_PARALLEL=1 OLLAMA_FLASH_ATTENTION=true OLLAMA_MLX=1 ollama serve`
-* `aider --model ollama/<model> --max-chat-history-tokens 16384 aider --map-tokens 8192`
-* `ollama launch opencode --model <model>`
-
-----
+For detailed information on context sizing, memory impact, Ollama vs LM Studio performance differences, and model tuning, see [MODEL_GUIDE.md](MODEL_GUIDE.md).

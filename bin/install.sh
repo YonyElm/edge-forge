@@ -47,7 +47,7 @@ case "$COMMAND" in
     ;;
   coding-agent)
     [[ -z "${TARGET:-}" ]] && die "Missing coding-agent target (claude|opencode|aider)"
-    source "$ROOT_DIR/installers/coding-agent/$TARGET.sh" \
+    source "$ROOT_DIR/installers/coding-agents/$TARGET.sh" \
       || die "Unknown coding-agent: $TARGET"
     run
     ;;

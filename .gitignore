@@ -1,1 +1,4 @@
 .aider*
+
+bin/npm-debug.log
+

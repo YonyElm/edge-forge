@@ -1,0 +1,19 @@
+FROM gemma3:4b
+
+# Large Context will create more SWAP memory ans slow the model. Power of 2, Anything bigger than 8K starts SWAP
+PARAMETER num_ctx 16384
+# Force 100% GPU offloading (Metal) when possible
+PARAMETER num_gpu 99
+## Switch KV cache from f16 2X to 8-bit 1X small compression (q8_0) 4-bit 0.5X aggressive compression (q4_0)
+## This frees up massive amounts of RAM for larger context. 4B model at q8_0 => ~4GB RAM at base, Then add 8K context at q8_0 => ~2GB RAM
+#PARAMETER kv_cache_type q4_0
+# Reduce "Thinking" overhead, Helps the agent stay focused on code blocks
+PARAMETER repeat_penalty 1.1
+PARAMETER temperature 0.0
+## Drastically reduces the "quadratic" slowdown of long context
+#PARAMETER flash_attn true
+# how many tokens are processed in parallel per forward pass, Power of 2
+# Lower => Slower Model, Higher => Heavier workload
+PARAMETER num_batch 64
+# Utilizing number of cores on CPU (Apple M1 has 8)
+PARAMETER num_thread 4

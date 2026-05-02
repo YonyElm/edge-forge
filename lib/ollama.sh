@@ -8,6 +8,16 @@ ensure_ollama() {
 ensure_ollama_running() {
   if ! pgrep -f "ollama serve" >/dev/null; then
     log "Starting Ollama"
-    OLLAMA_NUM_PARALLEL=1 OLLAMA_FLASH_ATTENTION=true OLLAMA_MLX=1 ollama serve >/dev/null 2>&1 &
+
+    # Build environment variables based on OS
+    local env_vars="OLLAMA_NUM_PARALLEL=1 OLLAMA_FLASH_ATTENTION=true"
+
+    # MLX (Metal Performance Shaders) is macOS-specific
+    if [[ "$OSTYPE" == "darwin"* ]]; then
+      env_vars="$env_vars OLLAMA_MLX=1"
+    fi
+
+    # Start ollama serve in the background
+    eval "$env_vars ollama serve" >/dev/null 2>&1 &
   fi
 }

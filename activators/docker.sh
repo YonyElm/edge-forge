@@ -32,12 +32,27 @@ log "Starting container..."
 $SUDO docker run --rm -it \
   -v "$PWD:$WORKDIR" \
   -w "$WORKDIR" \
+  -e TERM=xterm-256color \
+  -e LANG=en_US.UTF-8 \
+  -e LC_ALL=en_US.UTF-8 \
   --name "$CONTAINER_NAME" \
   "$IMAGE" bash -lc "
 
     set -e
 
     echo '[docker] Installing dependencies...'
+
+    apt-get update -qq && apt-get install -y -qq \
+      bash-completion \
+      locales \
+      vim \
+      curl \
+      git \
+      less > /dev/null
+
+    sed -i 's/# en_US.UTF-8 UTF-8/en_US.UTF-8 UTF-8/' /etc/locale.gen
+    locale-gen
+
     npm install -g opencode-ai
 
     echo ''

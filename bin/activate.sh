@@ -25,6 +25,7 @@ source "$ROOT_DIR/lib/core.sh"
 ########################################
 
 COMMAND="${1:-help}"
+shift || true
 
 ########################################
 # Dispatch
@@ -32,7 +33,7 @@ COMMAND="${1:-help}"
 
 case "$COMMAND" in
   docker)
-    source "$ROOT_DIR/activators/docker.sh"
+    bash "$ROOT_DIR/activators/docker.sh" "$@"
     ;;
   ollama)
     bash "$ROOT_DIR/activators/ollama.sh"
@@ -40,12 +41,13 @@ case "$COMMAND" in
   *)
     log "== Edge-Forge Activator =="
     echo "Usage:"
-    echo "  activate.sh docker     Start the Docker container"
-    echo "  activate.sh ollama     Ensure Ollama serve is running + model ready"
+    echo "  activate.sh docker <workspace>"
+    echo "  activate.sh ollama"
     echo ""
     echo "Examples:"
     echo "  ./bin/activate.sh ollama"
-    echo "  ./bin/activate.sh docker"
+    echo "  ./bin/activate.sh docker ."
+    echo "  ./bin/activate.sh docker ~/sandbox/project"
     echo ""
     ;;
 esac
